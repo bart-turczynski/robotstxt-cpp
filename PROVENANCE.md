@@ -77,3 +77,36 @@ Supporting build files added in this slice (not upstream copies):
 - `robots_smoke.cc` — tiny offline tracer-bullet binary printing `disallow` for
   `http://example.com/private/x` and `allow` for `http://example.com/public/x`
   against `user-agent: *\ndisallow: /private`.
+
+### C2 — matcher test adaptations (`robots_test.cc`)
+
+Imported from the pinned upstream (`.upstream-pinned/robots_test.cc`) and
+adapted with **only mechanical, behavior-neutral** changes. No assertion,
+fixture, `TEST` name, URL, user-agent string, or expected value was changed; the
+21 upstream cases (including `ID_Encoding`) run byte-for-byte identical inputs
+and expectations. All edits mirror C1's Abseil → C++17 stdlib substitution set:
+
+| Upstream Abseil / build surface | Local replacement |
+|---|---|
+| `#include "absl/strings/string_view.h"` | removed; added `<string_view>` |
+| `#include "absl/strings/str_cat.h"` | removed (no replacement include needed) |
+| `absl::string_view` (locals, `IsUserAgentAllowed` param, `RobotsStatsReporter` `Handle*` overrides, `IsValidUserAgentToObey(absl::string_view())`) | `std::string_view` |
+| `absl::StrAppend(&s, a, b, …)` | `s.append(a).append(b)…` (identical bytes) |
+| `absl::StrCat(a, b, …)` | `std::string(a).append(b)…` (identical bytes) |
+
+The `RobotsStatsReporter` `Handle*` methods **must** take `std::string_view` to
+still override the C1-de-Abseiled `googlebot::RobotsParseHandler` virtuals; this
+is a required mechanical consequence of C1, not an input/expectation change. The
+`StrAppend`/`StrCat` rewrites build the exact same string bytes that Abseil
+produced, so every matched URL and robots.txt body is unchanged. `robots.h` is
+included unchanged; no test-only plumbing change to the library was needed.
+
+Supporting build change (not an upstream copy):
+
+- `CMakeLists.txt` — under the existing OFF-by-default `ROBOTS_BUILD_TESTS`
+  toggle, wires GoogleTest as a **test-only, never-downloaded** dependency via
+  `find_package(GTest REQUIRED)` (system install; `GTest::gtest` /
+  `GTest::gtest_main`), builds the `robots_test` executable, and registers its
+  cases with CTest via `gtest_discover_tests`. No FetchContent, no network. The
+  production `robots` library and `robots_smoke` binary are unchanged and link
+  no Abseil and no test dependency.
