@@ -1,0 +1,14 @@
+# Build output
+build/
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+
+# Pinned upstream source cache — a frozen input, reproducible via the fetch in
+# PROVENANCE.md. Not committed; the de-Abseiled product files are the tracked
+# source of truth.
+.upstream-pinned/
+
+.DS_Store
