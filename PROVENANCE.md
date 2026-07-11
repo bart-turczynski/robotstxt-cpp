@@ -110,3 +110,56 @@ Supporting build change (not an upstream copy):
   cases with CTest via `gtest_discover_tests`. No FetchContent, no network. The
   production `robots` library and `robots_smoke` binary are unchanged and link
   no Abseil and no test dependency.
+
+### C3 — reporting layer + test adaptations (`reporting_robots.{cc,h}`, `reporting_robots_test.cc`)
+
+Imported from the pinned upstream (`.upstream-pinned/reporting_robots.{cc,h,test.cc}`,
+SHAs recorded above) and de-Abseiled to the C++17 standard library, mirroring
+C1's substitution style. Namespace (`googlebot`), class/function names, file
+organization, and the preserved correlation surface (`RobotsParsingReporter`,
+`RobotsParsedLine`, the `RobotsTagName` enum, and all `Handle*` /
+`ReportLineMetadata` / accessor signatures) are unchanged. All library edits are
+behavior-neutral Abseil → stdlib substitutions:
+
+| Upstream Abseil surface | Local replacement |
+|---|---|
+| `absl/container/btree_map.h`, `absl::btree_map<int, RobotsParsedLine>` | `<map>`, `std::map<int, RobotsParsedLine>` |
+| `absl/strings/string_view.h`, `absl::string_view` (all `Handle*` params) | `<string_view>`, `std::string_view` |
+| `absl/strings/ascii.h`, `absl::AsciiStrToLower(action)` | local internal-linkage `AsciiStrToLower` helper (ASCII-only, byte-accurate: only `A`–`Z` shifted, non-ASCII bytes unchanged) |
+
+**`btree_map` → `std::map` (sorted-by-line output preserved).** The results
+container is keyed by the `int` line number. `absl::btree_map` and `std::map`
+both keep keys in ascending order, so iterating in `parse_results()` yields the
+identical observable sorted-by-line sequence. This is verified by the adapted
+`LinesNumbersAreCountedCorrectly` test, which indexes `parse_results()[line_num
+- 1]` for a densely numbered file (lines 1–16) and matches each entry to its
+line — only an ascending, contiguous ordering satisfies those assertions, and it
+does (test green). No expected value or assertion was touched to accommodate the
+swap. `absl::SimpleAtoi` (PRD §6.1 → `std::from_chars`) is not referenced by the
+reporting layer. No product code includes or links Abseil.
+
+The reporting-layer test (`reporting_robots_test.cc`) was adapted with **only
+mechanical, behavior-neutral** changes. No assertion, fixture, `TEST` name,
+robots.txt input, or expected value was changed; both upstream cases run
+byte-for-byte identical inputs and expectations. Mechanical categories:
+
+| Upstream Abseil / build surface | Local replacement |
+|---|---|
+| `#include "absl/strings/string_view.h"` | removed; added `<string_view>` |
+| `#include "absl/strings/str_cat.h"` / `str_split.h` | removed (replaced inline, below) |
+| `absl::string_view` (locals, `expectLineToParseTo` param) | `std::string_view` |
+| `absl::StrCat(a, b, …)` (debug-only `LineMetadataToString` / `RobotsParsedLineToString`, used only in `operator<<` failure messages) | `std::string(...) + ...` with `std::to_string` for the `int`/`bool` fields — identical bytes (`bool` → `"0"`/`"1"`, `int` → decimal) |
+| `absl::StrAppend(&s, a, …)` | `s.append(a)…` (identical bytes) |
+| `absl::StrSplit(text, '\n')` → `std::vector<absl::string_view>` | local `SplitLines` harness helper → `std::vector<std::string_view>` (trailing-delimiter empty piece preserved; used only for failure-message context) |
+
+The `Handle*` overrides in the reporting surface **must** take `std::string_view`
+to keep overriding the C1-de-Abseiled `RobotsParseHandler` virtuals; this is a
+required mechanical consequence of C1, not a signature change of intent.
+
+Supporting build change (not an upstream copy):
+
+- `CMakeLists.txt` — adds `reporting_robots.cc` to the production `robots`
+  static library, and (under the existing `ROBOTS_BUILD_TESTS` toggle) builds
+  the `reporting_robots_test` executable against the same test-only,
+  never-downloaded GTest and registers it with CTest via
+  `gtest_discover_tests`. No FetchContent, no network.

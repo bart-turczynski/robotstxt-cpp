@@ -17,7 +17,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(ROBOTS_BUILD_TESTS "Build the robots.txt test suite (added in slice C2)." OFF)
 
 # Production static library. Links only the C++ standard library.
-add_library(robots STATIC robots.cc)
+# Slice C3 adds the de-Abseiled reporting layer (reporting_robots.cc).
+add_library(robots STATIC robots.cc reporting_robots.cc)
 target_include_directories(robots PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Tiny smoke/example binary that prints a real allow/disallow decision.
@@ -37,6 +38,13 @@ if(ROBOTS_BUILD_TESTS)
   add_executable(robots_test robots_test.cc)
   target_link_libraries(robots_test PRIVATE robots GTest::gtest GTest::gtest_main)
 
+  # Slice C3: the mechanically adapted upstream reporting suite
+  # (reporting_robots_test.cc). Same test-only, never-downloaded GTest wiring.
+  add_executable(reporting_robots_test reporting_robots_test.cc)
+  target_link_libraries(reporting_robots_test
+                        PRIVATE robots GTest::gtest GTest::gtest_main)
+
   include(GoogleTest)
   gtest_discover_tests(robots_test)
+  gtest_discover_tests(reporting_robots_test)
 endif()
