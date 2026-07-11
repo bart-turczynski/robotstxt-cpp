@@ -27,12 +27,22 @@ done
 
 ### Pristine file checksums (SHA-256, pinned commit)
 
+These are the checksums of the pristine upstream files as fetched into
+`.upstream-pinned/` by the loop above. After a re-fetch, verify against these
+values before importing (see the sync procedure below).
+
 | File                        | SHA-256 |
 |-----------------------------|---------|
 | `robots.cc`                 | `d05a7fa74c0e8b9fc440d15f4c3ae9a80873c0d950e569de2926303fd75ed473` |
 | `robots.h`                  | `912f3a5c6821f8a9a97269f9598b7f29ac1edf1ee20e173f1dd2d9ca48fb0bd5` |
 | `reporting_robots.cc`       | `36153bf94160e063e8832a068240181ddab286ad1f705ef4d045198ff00a321f` |
 | `reporting_robots.h`        | `e000f8914e574e0273ef99e8de8dc50bb48b7922068bd788d11a43780502216d` |
+| `robots_test.cc`            | `9868caef2ba44991331e90418f0e45a0c13893b0e4e11c8b0385166face9d670` |
+| `reporting_robots_test.cc`  | `3843c4bf3ca390cc094d14212dd2dece5b99c74628aeb9a54f82fc45e490ebc8` |
+| `LICENSE`                   | `c79a7fea0e3cac04cd43f20e7b648e5a0ff8fa5344e644b0ee09ca1162b62747` |
+
+The repository `LICENSE` is a byte-for-byte copy of the upstream Apache-2.0
+`LICENSE` (identical SHA-256 above).
 
 ## Vendored files and local changes
 
@@ -156,6 +166,16 @@ The `Handle*` overrides in the reporting surface **must** take `std::string_view
 to keep overriding the C1-de-Abseiled `RobotsParseHandler` virtuals; this is a
 required mechanical consequence of C1, not a signature change of intent.
 
+**License-header addition (C6, comment-only).** The upstream reporting sources
+ship *without* a per-file copyright/license header — they are covered only by
+the repository-level Apache-2.0 `LICENSE`. To ensure every vendored source file
+carries the applicable notice, C6 prepends the standard Apache-2.0 header block
+(with Google's copyright and a derivation/de-Abseil note pointing here) to
+`reporting_robots.cc` and `reporting_robots.h`. This is a leading comment block
+only; it adds no code and changes no behavior (verified by the unchanged 35/35
+ctest run). The matcher files `robots.cc`/`robots.h` already carried the upstream
+`Copyright 1999 Google LLC` Apache-2.0 header, which is preserved verbatim.
+
 Supporting build change (not an upstream copy):
 
 - `CMakeLists.txt` — adds `reporting_robots.cc` to the production `robots`
@@ -213,3 +233,117 @@ and whitespace already handled by `ParseRobotsTxt()`. The percent-escape input
 is chosen invariant under the parser's internal `MaybeEscapePattern`
 canonicalization (already-uppercase, ASCII-only hex), so the asserted value is
 unambiguously the pre-escape directive text. See `_worklog/C4.md`.
+
+### C5 — differential harness (maintainer tooling, not vendored upstream)
+
+`diff_harness/` and its build (`build-diff/`) are **project-authored maintainer
+tooling**, not copied upstream source, so they are not part of the vendored
+provenance surface and carry no upstream checksum. The harness builds pristine
+upstream and this replica from a local source path and diffs matcher and
+reporting output over the upstream corpus plus deterministic generated cases; it
+never downloads source and is excluded from the offline product build (PRD §7
+C5). It is noted here only because it consumes the same pinned
+`.upstream-pinned/` frozen input as the reproduce step below.
+
+## Complete vendored file inventory
+
+The tracked source tree contains exactly these files. Only the **upstream-derived**
+files below carry a pinned-state checksum (next section); the project-authored
+files evolve independently of the upstream SHA.
+
+| File | Origin | Header |
+|---|---|---|
+| `robots.cc` | upstream-derived (de-Abseiled) | preserved `Copyright 1999 Google LLC` Apache-2.0 |
+| `robots.h` | upstream-derived (de-Abseiled) | preserved `Copyright 1999 Google LLC` Apache-2.0 |
+| `reporting_robots.cc` | upstream-derived (de-Abseiled) | Apache-2.0 header added in C6 (upstream had none) |
+| `reporting_robots.h` | upstream-derived (de-Abseiled) | Apache-2.0 header added in C6 (upstream had none) |
+| `robots_test.cc` | upstream-derived (adapted) | preserved upstream Apache-2.0 |
+| `reporting_robots_test.cc` | upstream-derived (adapted) | preserved upstream Apache-2.0 |
+| `abseil_replacement_test.cc` | project-authored (C4) | — |
+| `callback_contract_test.cc` | project-authored (C4) | — |
+| `robots_smoke.cc` | project-authored (C1) | — |
+| `CMakeLists.txt` | project-authored | — |
+| `LICENSE` | upstream Apache-2.0 (verbatim) | — |
+| `NOTICE` | project-authored | — |
+| `PROVENANCE.md`, `README.md` | project-authored | — |
+| `diff_harness/` | project-authored (C5) | — |
+
+## Sync / re-sync procedure
+
+A "sync" reproduces the vendored engine from the pinned upstream. The **online**
+re-fetch step is needed only for a fresh sync of the frozen input; the
+**reproduce / verify** step runs fully **offline** against the recorded
+checksums below. The offline build, CI, and R-package install never re-fetch.
+
+**1. Re-fetch the frozen input (online, maintainer-only, only if `.upstream-pinned/`
+is absent).** Run the fetch loop under "Reproducing the frozen input" above at
+the pinned SHA `22b355ff855419e6a3ff8ff09c0ad7fdb17116f9`. `.upstream-pinned/`
+is gitignored and must never be committed.
+
+**2. Verify the frozen input (offline).** Confirm the fetched pristine files
+match the pinned commit before importing. The expected hashes are embedded
+inline, so no separate manifest file is needed:
+
+```sh
+shasum -a 256 -c - <<'EOF'
+d05a7fa74c0e8b9fc440d15f4c3ae9a80873c0d950e569de2926303fd75ed473  .upstream-pinned/robots.cc
+912f3a5c6821f8a9a97269f9598b7f29ac1edf1ee20e173f1dd2d9ca48fb0bd5  .upstream-pinned/robots.h
+36153bf94160e063e8832a068240181ddab286ad1f705ef4d045198ff00a321f  .upstream-pinned/reporting_robots.cc
+e000f8914e574e0273ef99e8de8dc50bb48b7922068bd788d11a43780502216d  .upstream-pinned/reporting_robots.h
+9868caef2ba44991331e90418f0e45a0c13893b0e4e11c8b0385166face9d670  .upstream-pinned/robots_test.cc
+3843c4bf3ca390cc094d14212dd2dece5b99c74628aeb9a54f82fc45e490ebc8  .upstream-pinned/reporting_robots_test.cc
+c79a7fea0e3cac04cd43f20e7b648e5a0ff8fa5344e644b0ee09ca1162b62747  .upstream-pinned/LICENSE
+EOF
+```
+
+A mismatch means the upstream content at that path changed or the SHA moved —
+treat it as a new validation event (PRD §6.1), not an automatic update.
+
+**3. Re-apply local changes.** Copy each upstream file to its repo path and
+re-apply exactly the behavior-neutral edits catalogued in "Vendored files and
+local changes" above (Abseil -> C++17 stdlib substitutions per file; plus the
+C6 comment-only Apache-2.0 header on the two reporting files). No algorithm,
+namespace, signature, assertion, or expected-value change is introduced.
+
+**4. Verify the vendored tree reproduces the pinned state (offline).** The
+committed de-Abseiled files are the source of truth and are checksummed below,
+so this check needs no network and no `.upstream-pinned/` cache — it runs from a
+clean checkout, from the repo root, with the expected hashes embedded inline:
+
+```sh
+shasum -a 256 -c - <<'EOF'
+e6d3b68701dd4c9062c7beecf973bab9834791ac1168e2907d5bc9dd9b7e32c3  robots.cc
+a4c0528ea5d2f1e759f2d452e86b0e5f5c85e2617fd2f76f887798a15376cc38  robots.h
+d45ce6c19e78df8c259e8dde9cf8fb7c2801cc6fdc63610c1885631122ecb186  reporting_robots.cc
+854b19b1353cf92636bb9da62d80e4a4d8fa69182c42858efd6c3e6feb0302ca  reporting_robots.h
+c5dcaf7261a7d8c40d440bacdd254ec449587afb6a0b5549fb69c81c65b275ef  robots_test.cc
+c248202fef53b760af2ea303d32399b2901f00c0e270b88e369c621e07cb34de  reporting_robots_test.cc
+EOF
+```
+
+**5. Re-validate.** Build and run the full gate; it must stay green:
+
+```sh
+cmake -S . -B build -DROBOTS_BUILD_TESTS=ON && cmake --build build
+ctest --test-dir build --output-on-failure   # expect 35/35 passed
+```
+
+### Offline integrity checksums (vendored, upstream-derived)
+
+SHA-256 of the committed de-Abseiled / adapted files at the pinned vendored
+state. A clean checkout that matches these hashes is byte-for-byte the audited
+vendored engine; verification is fully offline (no network, no
+`.upstream-pinned/` needed). Recompute with `shasum -a 256 <file>`.
+
+| File | SHA-256 (vendored, pinned state) |
+|---|---|
+| `robots.cc`                | `e6d3b68701dd4c9062c7beecf973bab9834791ac1168e2907d5bc9dd9b7e32c3` |
+| `robots.h`                 | `a4c0528ea5d2f1e759f2d452e86b0e5f5c85e2617fd2f76f887798a15376cc38` |
+| `reporting_robots.cc`      | `d45ce6c19e78df8c259e8dde9cf8fb7c2801cc6fdc63610c1885631122ecb186` |
+| `reporting_robots.h`       | `854b19b1353cf92636bb9da62d80e4a4d8fa69182c42858efd6c3e6feb0302ca` |
+| `robots_test.cc`           | `c5dcaf7261a7d8c40d440bacdd254ec449587afb6a0b5549fb69c81c65b275ef` |
+| `reporting_robots_test.cc` | `c248202fef53b760af2ea303d32399b2901f00c0e270b88e369c621e07cb34de` |
+
+The `shasum -a 256 -c` recipe in step 4 embeds these same hashes inline, so the
+offline reproduce/verify check runs from a clean checkout without any separate
+manifest file.
