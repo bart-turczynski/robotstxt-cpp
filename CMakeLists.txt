@@ -25,8 +25,18 @@ add_executable(robots_smoke robots_smoke.cc)
 target_link_libraries(robots_smoke PRIVATE robots)
 
 if(ROBOTS_BUILD_TESTS)
-  # Test targets are introduced in slice C2 (upstream matcher suite). The
-  # toggle exists now so the build interface is stable; it intentionally wires
-  # up nothing yet.
-  message(STATUS "ROBOTS_BUILD_TESTS=ON, but no tests exist until slice C2.")
+  # Slice C2: the mechanically adapted upstream matcher suite (robots_test.cc).
+  #
+  # GoogleTest is a TEST-ONLY dependency resolved from the system install via
+  # find_package. It is NEVER downloaded: no FetchContent, no network access
+  # during configure or build. The production `robots` library above links no
+  # test dependency and no Abseil.
+  enable_testing()
+  find_package(GTest REQUIRED)
+
+  add_executable(robots_test robots_test.cc)
+  target_link_libraries(robots_test PRIVATE robots GTest::gtest GTest::gtest_main)
+
+  include(GoogleTest)
+  gtest_discover_tests(robots_test)
 endif()
