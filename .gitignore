@@ -1,5 +1,7 @@
-# Build output
+# Build output (default `build/` plus any maintainer build dirs, e.g.
+# build-diff/ for the differential harness, build-ci/, build-default/).
 build/
+build*/
 *.o
 *.a
 *.so
