@@ -44,7 +44,19 @@ if(ROBOTS_BUILD_TESTS)
   target_link_libraries(reporting_robots_test
                         PRIVATE robots GTest::gtest GTest::gtest_main)
 
+  # Slice C4: the Abseil-replacement regression suite and the callback-contract
+  # test. Same test-only, never-downloaded GTest wiring; no Abseil.
+  add_executable(abseil_replacement_test abseil_replacement_test.cc)
+  target_link_libraries(abseil_replacement_test
+                        PRIVATE robots GTest::gtest GTest::gtest_main)
+
+  add_executable(callback_contract_test callback_contract_test.cc)
+  target_link_libraries(callback_contract_test
+                        PRIVATE robots GTest::gtest GTest::gtest_main)
+
   include(GoogleTest)
   gtest_discover_tests(robots_test)
   gtest_discover_tests(reporting_robots_test)
+  gtest_discover_tests(abseil_replacement_test)
+  gtest_discover_tests(callback_contract_test)
 endif()

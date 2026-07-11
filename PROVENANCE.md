@@ -163,3 +163,53 @@ Supporting build change (not an upstream copy):
   the `reporting_robots_test` executable against the same test-only,
   never-downloaded GTest and registers it with CTest via
   `gtest_discover_tests`. No FetchContent, no network.
+
+### C4 — regression + callback-contract tests (`abseil_replacement_test.cc`, `callback_contract_test.cc`)
+
+New, project-authored test files (not upstream copies). They add no product
+code and change nothing in `robots.{cc,h}`, `reporting_robots.{cc,h}`, or the
+adapted upstream suites; they only pin behavior through the preserved public
+surface. Wired under the existing OFF-by-default `ROBOTS_BUILD_TESTS` toggle
+against the same test-only, never-downloaded GTest (`find_package` +
+`gtest_discover_tests`). No Abseil, no FetchContent, no network.
+
+**`abseil_replacement_test.cc` — one dedicated failing-if-broken case per
+replacement.** Each `TEST` asserts the specific observable behavior the
+Abseil -> C++17 stdlib substitution must preserve:
+
+| Abseil surface replaced | Local replacement | Pinning test(s) |
+|---|---|---|
+| `absl::ascii_is*` (non-ASCII bytes classify all-false / unchanged) | `AsciiIs*` helpers | `NonAsciiBytesAreEscapedByteForByte`, `NonAsciiBytesNeverClassifyAsHexDigit`, `NonAsciiUserAgentByteIsNotAlpha` |
+| `absl::ascii_isxdigit` / `islower` / `ascii_toupper` (ASCII classification + case fold) | `AsciiIsXDigit` / `AsciiIsLower` / `AsciiToUpper` | `AsciiClassificationHexNormalization`, `AsciiClassificationUserAgentAlpha` |
+| `absl::FixedArray<size_t>` / `<char>` | `std::vector<size_t>` (matcher `pos[]`), `std::vector<char>` (index.htm rewrite) | `FixedArrayWildcardAndEndAnchorMatching`, `FixedArrayIndexHtmlRewriteBuffer` |
+| `absl::btree_map<int, RobotsParsedLine>` (sorted-by-line output) | `std::map` | `SortedReportingOutputByAscendingLine` |
+
+The non-ASCII / classification cases go through the public `MaybeEscapePattern`
+and `RobotsMatcher::IsValidUserAgentToObey`; the `FixedArray` cases through
+`RobotsMatcher::OneAgentAllowedByRobots` (wildcard, `$` anchor, and the
+`index.htm(l) -> /` rewrite); the sorted-output case through
+`RobotsParsingReporter::parse_results()`.
+
+*Integer conversion (`absl::SimpleAtoi` -> `std::from_chars`, PRD §6.1) has no
+case because that Abseil surface is not present in the vendored source at the
+pinned SHA* — neither `robots.cc` nor `reporting_robots.cc` parses integers
+(line numbers are incremented `int`s; the reporting layer uses only the
+`AsciiStrToLower` string helper). There is no product code path to pin with a
+failing-if-broken test, so none is fabricated. This matches the C1/C3 notes
+above that `SimpleAtoi` is unreferenced.
+
+**`callback_contract_test.cc` — the callback-contract correlation test (PRD
+§6.6).** A private, read-only `RobotsParseHandler` collector records
+Allow/Disallow callback type + value keyed by one-based line; the matcher is run
+to obtain `matching_line()`; the positive line is joined into the collector's
+lookup and the joined entry's **type, value, and line** are asserted. Cases:
+`DisallowWithComment` (comment removed), `DisallowWithSurroundingWhitespace`
+(leading/trailing whitespace stripped), `DisallowWithPercentEscapedPath`
+(percent-escape preserved verbatim; the directive is a prefix of the URL path so
+the asserted value can only originate from the parse callback, not from the
+URL), and `AllowWinsOverDisallowWithComment` (Allow type; winning line is the
+Allow line). The asserted value is the value the parse callback emits — comment
+and whitespace already handled by `ParseRobotsTxt()`. The percent-escape input
+is chosen invariant under the parser's internal `MaybeEscapePattern`
+canonicalization (already-uppercase, ASCII-only hex), so the asserted value is
+unambiguously the pre-escape directive text. See `_worklog/C4.md`.

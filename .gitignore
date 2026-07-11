@@ -11,4 +11,7 @@ build/
 # source of truth.
 .upstream-pinned/
 
+# Orchestration worklogs (subagent judgment notes) — not product content
+_worklog/
+
 .DS_Store
