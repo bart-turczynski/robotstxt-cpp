@@ -1,0 +1,30 @@
+# Differential harness corpus lock (Slice C5)
+#
+# Recorded provenance for a reproducible differential run. These values are the
+# committed record required by PRD §7 (C5); they mirror the compile-time
+# constants in diff_harness/case_generator.h, which are the runtime source of
+# truth. Keep the two in sync: if you change a value here, change it there (and
+# vice versa), and bump corpus_version on any change to the generation
+# algorithm or the corpus derivation.
+
+corpus_version = c5-corpus-v1
+
+# Default PRNG seed for the deterministic case generator (std::mt19937_64).
+# Decimal and hexadecimal are the same value.
+seed_decimal = 14254454739770919678
+seed_hex     = 0xC5D1FF0FFEEDCAFE
+
+# Number of deterministically generated cases (in addition to the upstream
+# corpus). Acceptance requires >= 10000.
+generated_count = 10000
+
+# Upstream corpus size (cases derived from .upstream-pinned test sources by
+# diff_harness/extract_corpus.py). Informational; regenerated from the pinned
+# sources, so it tracks the pinned SHA.
+upstream_corpus_cases = 138
+
+# Last verified result on this record:
+#   total cases      = 10138 (138 upstream + 10000 generated)
+#   matcher diffs    = 0
+#   reporting diffs  = 0
+#   exit status      = 0 (PASS)
